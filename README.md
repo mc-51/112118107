@@ -11,5 +11,5 @@ color:
 - yellow
 ```
 ---
-[高科大](https://www.nkust.edu.tw/["NKUST"])
-![]
+[高科大](https://www.nkust.edu.tw/)
+![NKUST](mobileadv_6752_6953241_72912.png)
