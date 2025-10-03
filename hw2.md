@@ -1,149 +1,101 @@
-import pandas as pd
+# WBS 專案時程分析報告 (圖 3-27 任務清單)
 
-tasks_data = [
-    {"ID": 1, "說明": "研擬計畫", "需時(天)": 1, "前置任務": []},
-    {"ID": 2, "說明": "任務分配", "需時(天)": 4, "前置任務": [1]},
-    {"ID": 3, "說明": "取得硬體", "需時(天)": 17, "前置任務": [1]},
-    {"ID": 4, "說明": "程式開發", "需時(天)": 70, "前置任務": [2]},
-    {"ID": 5, "說明": "安裝硬體", "需時(天)": 10, "前置任務": [3]},
-    {"ID": 6, "說明": "程式測試", "需時(天)": 30, "前置任務": [4]},
-    {"ID": 7, "說明": "撰寫使用手冊", "需時(天)": 25, "前置任務": [5]},
-    {"ID": 8, "說明": "轉換檔案", "需時(天)": 20, "前置任務": [5]},
-    {"ID": 9, "說明": "系統測試", "需時(天)": 25, "前置任務": [6]},
-    {"ID": 10, "說明": "使用者訓練", "需時(天)": 20, "前置任務": [7, 8]},
-    {"ID": 11, "說明": "使用者測試", "需時(天)": 25, "前置任務": [9, 10]}
-]
+本文件根據所提供的 11 項任務清單，進行關鍵路徑法 (CPM) 分析，並以 Mermaid 程式碼繪製 PERT/CPM 圖和甘特圖。
 
-df = pd.DataFrame(tasks_data)
+## 專案時程總覽與關鍵路徑計算
 
-# 初始化ES, EF, LS, LF, Slack
-df["ES"] = 0
-df["EF"] = 0
-df["LS"] = float("inf")
-df["LF"] = float("inf")
-df["Slack"] = float("inf")
+**專案總工期：** 155 天
 
-# 前向計算 (Early Start, Early Finish)
-for i in range(len(df)):
-    task_id = df.loc[i, "ID"]
-    duration = df.loc[i, "需時(天)"]
-    predecessors = df.loc[i, "前置任務"]
+| 任務 ID | 任務說明 | 需時 (D, 天) | 前置任務 | ES (最早開始) | EF (最早完成) | LS (最晚開始) | LF (最晚完成) | 浮時 (Slack) | 關鍵路徑 (CP) |
+| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | **研擬計畫** | **1** | - | **0** | **1** | **0** | **1** | **0** | **是** |
+| **2** | **任務分配** | **4** | 1 | **1** | **5** | **1** | **5** | **0** | **是** |
+| 3 | 取得硬體 | 17 | 1 | 1 | 18 | 17 | 34 | 16 | 否 |
+| **4** | **程式開發** | **70** | 2 | **5** | **75** | **5** | **75** | **0** | **是** |
+| 5 | 安裝硬體 | 10 | 3 | 18 | 28 | 24 | 34 | 6 | 否 |
+| **6** | **程式測試** | **30** | 4 | **75** | **105** | **75** | **105** | **0** | **是** |
+| 7 | 撰寫使用手冊 | 25 | 5 | 28 | 53 | 55 | 80 | 27 | 否 |
+| 8 | 轉換檔案 | 20 | 5 | 28 | 48 | 65 | 85 | 37 | 否 |
+| **9** | **系統測試** | **25** | 6 | **105** | **130** | **105** | **130** | **0** | **是** |
+| 10 | 使用者訓練 | 20 | 7, 8 | 53 | 73 | 90 | 110 | 37 | 否 |
+| **11** | **使用者測試** | **25** | 9, 10 | 130 | 155 | 130 | 155 | **0** | **是** |
 
-    if not predecessors:
-        df.loc[i, "ES"] = 0
-    else:
-        max_ef = 0
-        for pred_id in predecessors:
-            max_ef = max(max_ef, df[df["ID"] == pred_id]["EF"].iloc[0])
-        df.loc[i, "ES"] = max_ef
-    df.loc[i, "EF"] = df.loc[i, "ES"] + duration
+**關鍵路徑 (Critical Path)**：`1 → 2 → 4 → 6 → 9 → 11`
 
-project_duration = df["EF"].max()
-
-# 後向計算 (Late Start, Late Finish)
-for i in range(len(df) - 1, -1, -1):
-    task_id = df.loc[i, "ID"]
-    duration = df.loc[i, "需時(天)"]
-
-    successors = df[df["前置任務"].apply(lambda x: task_id in x)]
-
-    if successors.empty:
-        df.loc[i, "LF"] = project_duration
-    else:
-        min_ls = float("inf")
-        for _, succ_row in successors.iterrows():
-            min_ls = min(min_ls, succ_row["LS"])
-        df.loc[i, "LF"] = min_ls
-    df.loc[i, "LS"] = df.loc[i, "LF"] - duration
-
-# 計算Slack
-df["Slack"] = df["LF"] - df["EF"]
-
-# 找出關鍵路徑
-critical_path_tasks = df[df["Slack"] == 0]["ID"].tolist()
-
-print("任務分析結果：")
-print(df.to_string())
-print(f"\n專案總工期： {project_duration} 天")
-print(f"關鍵路徑上的任務ID： {critical_path_tasks}")
-
-# 將結果保存到CSV文件
-df.to_csv("task_analysis_results.csv", index=False, encoding="utf-8-sig")
-
-# 準備甘特圖數據
-gantt_data = []
-for index, row in df.iterrows():
-    gantt_data.append({
-        "Task": f"任務{row["ID"]}: {row["說明"]}",
-        "Start": row["ES"],
-        "End": row["EF"],
-        "Duration": row["需時(天)"]
-    })
-
-gantt_df = pd.DataFrame(gantt_data)
-gantt_df.to_csv("gantt_chart_data.csv", index=False, encoding="utf-8-sig")
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
-# 讀取甘特圖數據
-df_gantt = pd.read_csv("gantt_chart_data.csv")
-
-# 將開始和結束時間轉換為日期格式，假設從第一天開始
-df_gantt["Start_Date"] = pd.to_datetime(df_gantt["Start"], unit=\'D\', origin=\'2025-01-01\')
-df_gantt["End_Date"] = pd.to_datetime(df_gantt["End"], unit=\'D\', origin=\'2025-01-01\')
-
-# 繪製甘特圖
-fig, ax = plt.subplots(figsize=(12, 8))
-
-# 繪製每個任務的條形圖
-for i, row in df_gantt.iterrows():
-    ax.barh(row["Task"], row["Duration"], left=row["Start_Date"], height=0.8)
-
-# 設置X軸為日期格式
-ax.xaxis.set_major_locator(mdates.DayLocator(interval=10)) # 每10天一個主要刻度
-ax.xaxis.set_major_formatter(mdates.DateFormatter(\'%Y-%m-%d\'))
-plt.xticks(rotation=45, ha=\'right\')
-
-# 設置Y軸標籤
-ax.set_xlabel("日期")
-ax.set_ylabel("任務")
-ax.set_title("專案甘特圖")
-ax.invert_yaxis() # 讓第一個任務在頂部顯示
-
-plt.tight_layout()
-plt.savefig("gantt_chart.png")
-print("甘特圖已保存為 gantt_chart.png")
+---
+```mermaid
 graph TD
-    A[1: 研擬計畫]
-    B[2: 任務分配]
-    C[3: 取得硬體]
-    D[4: 程式開發]
-    E[5: 安裝硬體]
-    F[6: 程式測試]
-    G[7: 撰寫使用手冊]
-    H[8: 轉換檔案]
-    I[9: 系統測試]
-    J[10: 使用者訓練]
-    K[11: 使用者測試]
+    %% 專案任務邏輯網路圖 (PERT/CPM 模擬)
+    
+    %% 定義所有任務節點 (Tx)
+    T1["1. 研擬計畫 (1d)"]
+    T2["2. 任務分配 (4d)"]
+    T3["3. 取得硬體 (17d)"]
+    T4["4. 程式開發 (70d)"]
+    T5["5. 安裝硬體 (10d)"]
+    T6["6. 程式測試 (30d)"]
+    T7["7. 撰寫手冊 (25d)"]
+    T8["8. 轉換檔案 (20d)"]
+    T9["9. 系統測試 (25d)"]
+    T10["10. 使用者訓練 (20d)"]
+    T11["11. 使用者測試 (25d)"]
+    
+    %% 關鍵路徑 (使用粗箭頭 ==> 標註)
+    T1 ==> T2
+    T2 ==> T4
+    T4 ==> T6
+    T6 ==> T9
+    T9 ==> T11
+    
+    %% 非關鍵路徑
+    T1 --> T3
+    T3 --> T5
+    T5 --> T7
+    T5 --> T8
+    
+    %% 合併
+    T7 --> T10
+    T8 --> T10
+    T10 --> T11
+    
+    %% 關鍵路徑節點樣式 (淺紅背景)
+    style T1 fill:#f99, stroke:#333, stroke-width:2px
+    style T2 fill:#f99, stroke:#333, stroke-width:2px
+    style T4 fill:#f99, stroke:#333, stroke-width:2px
+    style T6 fill:#f99, stroke:#333, stroke-width:2px
+    style T9 fill:#f99, stroke:#333, stroke-width:2px
+    style T11 fill:#f99, stroke:#333, stroke-width:2px
+```
+---
 
-    A --> B
-    A --> C
-    B --> D
-    C --> E
-    D --> F
-    E --> G
-    E --> H
-    F --> I
-    G --> J
-    H --> J
-    I --> K
-    J --> K
+```mermaid
 
-    style A fill:#F9F,stroke:#333,stroke-width:2px
-    style B fill:#F9F,stroke:#333,stroke-width:2px
-    style D fill:#F9F,stroke:#333,stroke-width:2px
-    style F fill:#F9F,stroke:#333,stroke-width:2px
-    style I fill:#F9F,stroke:#333,stroke-width:2px
-    style K fill:#F9F,stroke:#333,stroke-width:2px
+gantt
+    title 專案排程甘特圖與關鍵路徑 (總工期: 155 天)
+    dateFormat YYYY-MM-DD
+    axisFormat %D
+
+    section 啟動與規劃
+    研擬計畫 :crit, t1, 2025-10-06, 1d
+    任務分配 :crit, t2, after t1, 4d
+
+    section 硬體與開發
+    取得硬體 :t3, after t1, 17d 
+    程式開發 :crit, t4, after t2, 70d 
+    安裝硬體 :t5, after t3, 10d 
+
+    section 測試與文件
+    程式測試 :crit, t6, after t4, 30d 
+    撰寫使用手冊 :t7, after t5, 25d 
+    轉換檔案 :t8, after t5, 20d 
+
+    section 結尾與驗收
+    %% 使用者訓練 (t10) ES = max(EF7, EF8) = 53
+    使用者訓練 :t10, after t8, 20d 
+    
+    %% 系統測試 (t9) ES = EF6 = 105
+    系統測試 :crit, t9, after t6, 25d 
+    
+    %% 使用者測試 (t11) ES = Max(EF9, EF10) = 130
+    使用者測試 :crit, t11, after t10, 25d
+```
